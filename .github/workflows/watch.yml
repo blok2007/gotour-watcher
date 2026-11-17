@@ -1,0 +1,36 @@
+name: GO Tour ticket watcher
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # every 5 min (GitHub often runs it a few minutes late)
+  workflow_dispatch: {}      # lets you click "Run workflow" to test
+
+permissions:
+  contents: write            # so it can save its memory file back to the repo
+
+concurrency:
+  group: gotour-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check for ticket drop
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 gotour_watch.py --once --state gotour_state.json
+
+      - name: Save state (only if something changed)
+        run: |
+          git config user.name "gotour-bot"
+          git config user.email "gotour-bot@users.noreply.github.com"
+          git add gotour_state.json
+          git diff --cached --quiet || (git commit -m "update watcher state" && git push)
