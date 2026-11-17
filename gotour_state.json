@@ -1,0 +1,12 @@
+{
+  "fired": {},
+  "news_seen": [],
+  "fail_counts": {
+    "official_la": 0,
+    "official_tickets": 0,
+    "official_gotour_hub": 0,
+    "leekduck": 0
+  },
+  "news_baselined": true,
+  "last_heartbeat": 1794938396.365682
+}
