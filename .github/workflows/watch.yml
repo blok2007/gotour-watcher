@@ -26,6 +26,7 @@ jobs:
       - name: Check for ticket drop
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python3 gotour_watch.py --once --state gotour_state.json
 
       - name: Save state (only if something changed)
