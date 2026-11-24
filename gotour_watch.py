@@ -171,7 +171,9 @@ def notify(title, body, cfg, urgent=True):
     stamp = datetime.now().strftime("%H:%M:%S")
     print(f"\n[{stamp}] *** ALERT *** {title}\n{body}\n", flush=True)
 
-    if cfg.ntfy_topic:
+    if not cfg.ntfy_topic:
+        print("  ntfy: SKIPPED - no topic set (NTFY_TOPIC secret missing or empty)", flush=True)
+    else:
         try:
             req = urllib.request.Request(
                 f"https://ntfy.sh/{cfg.ntfy_topic}",
@@ -185,9 +187,25 @@ def notify(title, body, cfg, urgent=True):
                 },
                 method="POST",
             )
-            urllib.request.urlopen(req, timeout=15).read()
+            with urllib.request.urlopen(req, timeout=15) as r:
+                print(f"  ntfy: sent OK (HTTP {r.status}) to topic of length {len(cfg.ntfy_topic)}", flush=True)
         except Exception as e:  # noqa: BLE001
             print(f"  ntfy failed: {e}", flush=True)
+
+    hook = os.getenv("DISCORD_WEBHOOK")
+    if hook:
+        try:
+            ping = "@everyone " if urgent else ""
+            payload = json.dumps({
+                "content": f"{ping}**{title}**\n{body}\n{BUY_URL}",
+                "allowed_mentions": {"parse": ["everyone"]},
+            }).encode()
+            req = urllib.request.Request(hook, data=payload, method="POST",
+                                         headers={"Content-Type": "application/json", "User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                print(f"  discord: sent OK (HTTP {r.status})", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"  discord failed: {e}", flush=True)
 
     user, pw, to = os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"), os.getenv("ALERT_EMAIL_TO")
     if user and pw and to:
@@ -281,6 +299,14 @@ def run_once(cfg, state, verbose=True):
 
     for detail, url in alerts:
         notify("GO TOUR LA: TICKETS MAY BE LIVE", f"{detail}\n{url}\nBuy in the app: Main Menu > Events", cfg)
+
+    # Keep nagging: re-send the latest alert on the next 6 runs so one dropped push can't cost you.
+    if alerts:
+        state["repeat_left"] = 6
+        state["repeat_msg"] = "\n".join(f"{d}\n{u}" for d, u in alerts)
+    elif state.get("repeat_left", 0) > 0:
+        state["repeat_left"] -= 1
+        notify("REMINDER: GO TOUR LA TICKETS", state["repeat_msg"] + "\nBuy in the app: Main Menu > Events", cfg)
 
     return alerts
 
